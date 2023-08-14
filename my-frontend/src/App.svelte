@@ -1,89 +1,112 @@
 <script lang="ts">
-    import Users from './lib/Users.svelte';
+import Users from './lib/Users.svelte';
+import Home from './lib/Home.svelte';
+import Menu from './lib/Menu.svelte';
 
-    const users = [
-    {
-                    "id": 1,
-                    "username": "User1",
-                    "companies": [
-                        {
-                            "id": 10,
-                            "name": "Company 10"
-                        },
-                        {
-                            "id": 18,
-                            "name": "Company 18"
-                        },
-                        {
-                            "id": 32,
-                            "name": "Company 32"
-                        },
-                        {
-                            "id": 34,
-                            "name": "Company 34"
-                        },
-                        {
-                            "id": 69,
-                            "name": "Company 69"
-                        }
-                    ]
-                },
-                {
-                    "id": 2,
-                    "username": "User2",
-                    "companies": [
-                        {
-                            "id": 3,
-                            "name": "Company 3"
-                        },
-                        {
-                            "id": 45,
-                            "name": "Company 45"
-                        },
-                        {
-                            "id": 59,
-                            "name": "Company 59"
-                        },
-                        {
-                            "id": 71,
-                            "name": "Company 71"
-                        }
-                    ]
-                },
-                {
-                    "id": 3,
-                    "username": "User3",
-                    "companies": [
-                        {
-                            "id": 10,
-                            "name": "Company 10"
-                        },
-                        {
-                            "id": 53,
-                            "name": "Company 53"
-                        },
-                        {
-                            "id": 56,
-                            "name": "Company 56"
-                        },
-                        {
-                            "id": 84,
-                            "name": "Company 84"
-                        },
-                        {
-                            "id": 94,
-                            "name": "Company 94"
-                        }
-                    ]
-                }
-];
+import { onMount } from 'svelte';
+import { Route } from 'tinro';
+import { PaginationItem } from 'flowbite-svelte';
+
+let p = 1;
+let pSize = 100;
+let pTotal = 10;
+let users;
+let helper = { current: p, pages: pTotal, size: pSize, total: 0 };
+
+function displayUsers(pNo, pSize) {
+
+  const query = `query ($page: Int, $pageSize: Int, $username: String) {
+    Users(pagination: {page: $page, pageSize: $pageSize}, filter: {username: $username}) {
+      data {
+        id
+        username
+        companies {
+        id
+        name
+        rooms {
+          id
+          name
+        }
+      }
+      }
+      meta {
+        pagination {
+          page
+          pageSize
+          totalOfPage
+          totalOfRecord
+        }
+      }
+    }
+  }`;
+
+  const variables = { "page": pNo, "pageSize": pSize };
+
+  fetch('https://rnd-ns2-tech-challenge-next-be.vercel.app/api/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  }).then(response => response.json())
+  .then(respobj => {
+    //console.log(respobj);
+    users = respobj.data.Users.data;
+
+    let page = respobj.data.Users.meta.pagination.page;
+    let pageSize = respobj.data.Users.meta.pagination.pageSize;
+    let totalOfPage = respobj.data.Users.meta.pagination.totalOfPage;
+    let totalOfRecord = respobj.data.Users.meta.pagination.totalOfRecord;
+
+    helper.current = page;
+    helper.pages = totalOfPage;
+    helper.size = pageSize;
+    helper.total = totalOfRecord;
+  })
+  .catch(error => console.error(error));
+  
+}
+
+onMount(async () => {
+  displayUsers(p, pSize);
+});
+
+const previous = () => {
+  if (p>1) {
+    p--;
+    displayUsers(p, pSize);
+  }
+ };
+
+const next = () => {
+  if (p<helper.pages) {
+    p++;
+    displayUsers(p, pSize);
+  }
+};
 
 </script>
 
-<main>
+<Menu/>
+
+<Route path="/">
+  <Home/>
+</Route>
+
+<Route path="/users">
   <h1>Harvest Tech Challenge</h1>
+  <br/>
+  <div class="flex space-x-3 items-center justify-center">
+    <PaginationItem class="flex items-center gap-2 text-white bg-gray-800" on:click={previous}>Previous</PaginationItem>
+    <PaginationItem class="flex items-center gap-2 text-white bg-gray-800" on:click={next}>Next</PaginationItem>
+    <div class="text-sm text-gray-700 dark:text-gray-400">
+      Showing page <span class="font-semibold text-gray-900 dark:text-white">{helper.current}</span> of
+      <span class="font-semibold text-gray-900 dark:text-white">{helper.pages}</span> pages (page size: 
+      <span class="font-semibold text-gray-900 dark:text-white">{helper.size}</span>, total entries:
+      <span class="font-semibold text-gray-900 dark:text-white">{helper.total}</span>)
+    </div>
+  </div>
+  <br/>
   <Users {users} />
-</main>
+</Route>
 
 <style>
   .logo {
